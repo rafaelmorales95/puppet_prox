@@ -52,7 +52,7 @@ function post_install() {
 
   msg_info "Creando usuario SSH: puppetadmin"
   $LXC_CMD useradd -m -s /bin/bash puppetadmin
-  echo "puppetadmin:P@ssw0rd!" | $LXC_CMD chpasswd
+  echo "puppetadmin:puppet" | $LXC_CMD chpasswd
   $LXC_CMD usermod -aG sudo puppetadmin
 
   msg_info "Habilitando SSH"
@@ -85,7 +85,7 @@ msg_ok "Instalación completada correctamente 🎉"
 IP=$(pct exec $CTID -- hostname -I | awk '{print $1}')
 echo -e "\nAcceso por SSH:"
 echo -e "  Usuario: puppetadmin"
-echo -e "  Contraseña: P@ssw0rd!"
+echo -e "  Contraseña: puppet"
 echo -e "  IP: $IP"
 echo -e "  Puerto SSH: 22"
 echo -e "  Puppet Server está escuchando en el puerto 8140\n"
