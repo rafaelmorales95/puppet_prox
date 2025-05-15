@@ -26,7 +26,7 @@ catch_errors
 
 function default_settings() {
   CT_TYPE="1"
-  PW="P@ssw0rd!"
+  PW="puppet"
   CT_ID=$NEXTID
   HN="puppet-server"
   DISK_SIZE="$var_disk"
@@ -35,6 +35,14 @@ function default_settings() {
   BRG="vmbr0"
   NET="dhcp"
   GATE=""
+  APT_CACHER="no"
+  APT_CACHER_IP=""
+  DISABLEIP6="no"
+  MTU=""
+  SD=""
+  NS=""
+  MAC=""
+  VLAN=""
   SSH="yes"
   VERB="no"
   echo_default
