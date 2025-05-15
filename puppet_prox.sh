@@ -2,7 +2,7 @@
 set -e
 
 # Variables LXC
-CTID=105
+CTID=108
 HOSTNAME="puppetserver"
 STORAGE="local-lvm"
 TEMPLATE="debian-12-standard_12.0-1_amd64.tar.zst"
