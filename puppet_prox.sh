@@ -1,71 +1,86 @@
 #!/usr/bin/env bash
-set -e
+source <(curl -s https://raw.githubusercontent.com/tteck/Proxmox/main/misc/build.func)
+# Copyright (c) 2021-2024 tteck
+# Author: tteck (tteckster)
+# License: MIT
+# https://github.com/tteck/Proxmox/raw/main/LICENSE
 
-# Variables LXC
-CTID=108
-HOSTNAME="puppetserver"
-STORAGE="local-lvm"
-TEMPLATE="debian-12-standard_12.0-1_amd64.tar.zst"
-BRIDGE="vmbr0"
-DISK_SIZE="8G"
-RAM="2048"
-CPU="2"
+function header_info {
+clear
+cat <<"EOF"
+ ____                  _                   
+|  _ \ ___  _ __   ___| |_ _ __ _   _ ___ 
+| |_) / _ \| '_ \ / _ \ __| '__| | | / __|
+|  __/ (_) | |_) |  __/ |_| |  | |_| \__ \
+|_|   \___/| .__/ \___|\__|_|   \__,_|___/
+           |_|                            
+ Puppet Server LXC Installer
+EOF
+}
+header_info
+echo -e "Loading..."
 
-# Usuario SSH dentro del LXC
-USER="puppetadmin"
-PASS="Puppet123!"
+APP="Puppet Server"
+var_disk="8"
+var_cpu="2"
+var_ram="2048"
+var_os="debian"
+var_version="12"
+variables
+color
+catch_errors
 
-echo "==> Creando contenedor LXC Debian 12 con ID $CTID..."
+function default_settings() {
+  CT_TYPE="1"           # LXC container
+  PW=""                 # empty = auto gen
+  CT_ID=$NEXTID
+  HN=$NSAPP
+  DISK_SIZE="$var_disk"
+  CORE_COUNT="$var_cpu"
+  RAM_SIZE="$var_ram"
+  BRG="vmbr0"
+  NET="dhcp"
+  GATE=""
+  APT_CACHER=""
+  APT_CACHER_IP=""
+  DISABLEIP6="no"
+  MTU=""
+  SD=""
+  NS=""
+  MAC=""
+  VLAN=""
+  SSH="yes"             # habilitar SSH
+  VERB="no"
+  echo_default
+}
 
-pct create $CTID $STORAGE:templates/$TEMPLATE \
-  --hostname $HOSTNAME \
-  --memory $RAM \
-  --cores $CPU \
-  --net0 name=eth0,bridge=$BRIDGE,ip=dhcp \
-  --rootfs $STORAGE:$DISK_SIZE \
-  --swap 512 \
-  --unprivileged 0 \
-  --password $PASS
+function install_puppet() {
+  msg_info "Updating container and installing prerequisites"
+  pct exec $CT_ID -- bash -c "apt-get update && apt-get upgrade -y && apt-get install -y wget gnupg2 apt-transport-https openjdk-17-jre-headless"
+  
+  msg_info "Adding Puppet repository and installing puppetserver"
+  pct exec $CT_ID -- bash -c "wget https://apt.puppet.com/puppet7-release-${var_os}.deb -O /tmp/puppet7-release.deb"
+  pct exec $CT_ID -- bash -c "dpkg -i /tmp/puppet7-release.deb"
+  pct exec $CT_ID -- bash -c "apt-get update && apt-get install -y puppetserver"
 
-echo "==> Iniciando contenedor..."
-pct start $CTID
+  msg_info "Configuring Puppet Server memory (2GB)"
+  pct exec $CT_ID -- bash -c "sed -i 's/JAVA_ARGS.*/JAVA_ARGS=\"-Xms2g -Xmx2g\"/' /etc/default/puppetserver"
+  
+  msg_info "Starting Puppet Server service"
+  pct exec $CT_ID -- systemctl daemon-reload
+  pct exec $CT_ID -- systemctl enable puppetserver
+  pct exec $CT_ID -- systemctl start puppetserver
 
-echo "==> Esperando que el contenedor arranque..."
-sleep 15
+  msg_ok "Puppet Server instalado y en ejecución"
+}
 
-echo "==> Instalando Puppetserver dentro del contenedor..."
+function start() {
+  default_settings
+  build_container
+  install_puppet
+  description
+  msg_ok "Completed Successfully!\n"
+  echo -e "${APP} should be reachable at port 8140 on the container IP.\nSSH access: ssh root@${IP} (if SSH enabled)"
+}
 
-# Ejecutar comandos dentro del LXC
-pct exec $CTID -- bash -c "
-  set -e
-  apt update
-  apt install -y wget gnupg2 curl lsb-release apt-transport-https software-properties-common openssh-server
-
-  wget https://apt.puppet.com/puppet7-release-$(lsb_release -cs).deb -O /tmp/puppet-release.deb
-  dpkg -i /tmp/puppet-release.deb
-  apt update
-  apt install -y puppetserver
-
-  # Configurar memoria puppetserver
-  sed -i 's/-Xms2g/-Xms2g/' /etc/default/puppetserver
-  sed -i 's/-Xmx2g/-Xmx2g/' /etc/default/puppetserver
-
-  systemctl enable puppetserver
-  systemctl start puppetserver
-
-  # Crear usuario
-  id $USER || useradd -m -s /bin/bash $USER
-  echo \"$USER:$PASS\" | chpasswd
-
-  # Permitir acceso ssh por password
-  sed -i 's/^#PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-  systemctl restart ssh
-"
-
-IP=$(pct exec $CTID -- hostname -I | awk '{print $1}')
-
-echo "==> Contenedor creado y Puppetserver instalado."
-echo "Conéctate via SSH:"
-echo "ssh $USER@$IP"
-echo "Contraseña: $PASS"
-echo "Puppetserver corre en el puerto 8140."
+start
