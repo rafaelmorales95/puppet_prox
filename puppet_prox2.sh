@@ -27,6 +27,7 @@ var_ram="2048"
 var_os="debian"
 var_version="12"
 variables
+NEXTID=$(pvesh get /cluster/nextid)
 color
 catch_errors
 
